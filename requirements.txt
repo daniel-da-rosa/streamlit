@@ -4,3 +4,6 @@ plotly
 streamlit-plotly-events
 altair
 openpyxl
+openai
+python-dotenv
+tabulate

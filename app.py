@@ -4,6 +4,9 @@ import plotly.express as px
 from streamlit_plotly_events import plotly_events
 import altair as alt
 
+# importa a função que foi criada para analise de dados
+from ai_analyst import get_gpt_analysis
+
 st.set_page_config(layout='wide')
 titulo, = st.columns(1)
 col5, col6, col7, col8, col9 = st.columns(5)
@@ -437,3 +440,77 @@ with col9:
         label="Fator Quilo",
         value=f"R$/Kg {formatar_moeda(valor_por_quilo)}"
     )
+# aqui irá ser gerado a analise de implementação do dashboard
+coluna_llm, = st.columns(1)
+
+with coluna_llm:
+    coluna_llm.markdown("---")
+
+    # adiciona formatação para o Resumo
+
+    with coluna_llm:
+        st.markdown("---")
+
+        st.markdown(
+            """
+            <p style="
+                background-color: #0E1117; 
+                color: #7FFF00; 
+                font-size: 28px;
+                font-weight: bold;
+                text-align: center;
+                border-radius: 10px;
+                padding: 10px;
+                border: 2px #262730;
+            ">
+                Análise de Insights Estruturados por IA (GPT-4o mini)
+            </p>
+            """,
+            unsafe_allow_html=True
+        )
+
+    if not data_set_filtrado.empty:
+        # top 5 grupos maior valor
+        top_grupos = data_set_filtrado.groupby(
+            'grupo_produto')['valor_total_item'].sum().nlargest(5).index.tolist()
+        df_grupos = data_set_filtrado[data_set_filtrado['grupo_produto'].isin(
+            top_grupos)]
+        estatistica_por_grupo = df_grupos.groupby(
+            'grupo_produto')[['valor_total_item', 'quantidade']].describe().transpose()
+
+        # top 5 vendedores
+        top_venddores = data_set_filtrado.groupby(
+            'nome_vendedor')['valor_total_item'].sum().nlargest(5).transpose()
+        df_vendedor = data_set_filtrado[data_set_filtrado['nome_vendedor'].isin(
+            top_venddores)]
+        estatistica_por_vendedor = df_vendedor.groupby(
+            'nome_vendedor')[['valor_total_item', 'quantidade']].describe().transpose()
+
+        # string de entrada para a LLM
+        estatistica_string = (
+            f"{estatistica_por_grupo.to_markdown(floatfmt='.2f')}\n\n"
+            f"{estatistica_por_vendedor.to_markdown(floatfmt='.2f')}"
+        )
+        # Mensagem de instrução personalizada para a LLM,
+        instrucao_foco = (
+            "Gere insights críticos em dois blocos de texto nomeados."
+            "O primeiro bloco deve começar obrigatoriamente com o marcador **'--ANÁLISE-PRODUTO--'** e conter 3 insights sobre os GRUPOS."
+            "O segundo bloco deve começar obrigatoriamente com o marcador **'--ANÁLISE-PESSOA--'** e conter 3 insights sobre os VENDEDORES."
+            "**MANTENHA OS NOMES DAS ENTIDADES RIGIDAMENTE SEPARADOS.**"
+        )
+
+    @st.cache_data(show_spinner="Analisando dados com IA...")
+    def analisar_dados_com_ia(data_string, instruction):
+        # chama a função
+        return get_gpt_analysis(
+            statistics_data_string=data_string,
+            custom_instruction=instruction
+        )
+
+    # chama a função
+    analise_interpretada = analisar_dados_com_ia(
+        estatistica_string, instrucao_foco
+    )
+
+    # Exibe o resultado
+    coluna_llm.markdown(analise_interpretada)
